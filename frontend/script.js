@@ -1,117 +1,117 @@
-const OPTIONS = {
+const data = {
   gender: ["Men", "Women", "Boys", "Girls", "Unisex"],
   subcategory: [
-    "topwear",
-    "bottomwear",
-    "innerwear",
-    "saree",
-    "dress",
-    "loungewear and nightwear",
     "apparel set",
+    "bottomwear",
+    "dress",
+    "innerwear",
+    "loungewear and nightwear",
+    "saree",
     "socks",
+    "topwear",
   ],
-  articletype: [
-    "shirts",
-    "jeans",
-    "track pants",
-    "tshirts",
-    "tops",
-    "bra",
-    "sweatshirts",
-    "kurtas",
-    "waistcoat",
-    "shorts",
-    "briefs",
-    "sarees",
-    "innerwear vests",
-    "dresses",
-    "night suits",
-    "skirts",
-    "blazers",
-    "kurta sets",
-    "shrug",
-    "trousers",
-    "camisoles",
-    "boxers",
-    "dupatta",
-    "capris",
-    "bath robe",
-    "tunics",
-    "jackets",
-    "trunk",
-    "lounge pants",
-    "sweaters",
-    "tracksuits",
-    "swimwear",
-    "nightdress",
+  articleType: [
     "baby dolls",
-    "leggings",
-    "kurtis",
-    "jumpsuit",
-    "suspenders",
-    "robe",
-    "salwar and dupatta",
-    "patiala",
-    "stockings",
-    "tights",
-    "churidar",
-    "lounge tshirts",
-    "lounge shorts",
-    "shapewear",
-    "nehru jackets",
-    "salwar",
-    "jeggings",
-    "rompers",
-    "booties",
-    "lehenga choli",
-    "clothing set",
-    "rain jacket",
+    "bath robe",
     "belts",
+    "blazers",
+    "booties",
+    "boxers",
+    "bra",
+    "briefs",
+    "camisoles",
+    "capris",
+    "churidar",
+    "clothing set",
+    "dresses",
+    "dupatta",
+    "innerwear vests",
+    "jackets",
+    "jeans",
+    "jeggings",
+    "jumpsuit",
+    "kurta sets",
+    "kurtas",
+    "kurtis",
+    "leggings",
+    "lehenga choli",
+    "lounge pants",
+    "lounge shorts",
+    "lounge tshirts",
+    "nehru jackets",
+    "night suits",
+    "nightdress",
+    "patiala",
+    "rain jacket",
+    "robe",
+    "rompers",
+    "salwar",
+    "salwar and dupatta",
+    "sarees",
+    "shapewear",
+    "shirts",
+    "shorts",
+    "shrug",
+    "skirts",
+    "stockings",
     "suits",
+    "suspenders",
+    "sweaters",
+    "sweatshirts",
+    "swimwear",
+    "tights",
+    "tops",
+    "track pants",
+    "tracksuits",
+    "trousers",
+    "trunk",
+    "tshirts",
+    "tunics",
+    "waistcoat",
   ],
-  basecolour: [
-    "navy blue",
-    "blue",
-    "black",
-    "grey",
-    "green",
-    "purple",
-    "white",
+  baseColour: [
     "beige",
+    "black",
+    "blue",
     "brown",
-    "pink",
-    "maroon",
-    "red",
-    "off white",
-    "yellow",
-    "charcoal",
-    "multi",
-    "magenta",
-    "orange",
-    "sea green",
-    "cream",
-    "peach",
-    "olive",
     "burgundy",
+    "charcoal",
+    "coffee brown",
+    "cream",
+    "fluorescent green",
+    "gold",
+    "green",
+    "grey",
     "grey melange",
-    "rust",
-    "rose",
-    "lime green",
-    "teal",
     "khaki",
     "lavender",
-    "mustard",
-    "coffee brown",
-    "skin",
-    "turquoise blue",
-    "nude",
+    "lime green",
+    "magenta",
+    "maroon",
     "mauve",
+    "multi",
     "mushroom brown",
-    "tan",
-    "gold",
-    "taupe",
+    "mustard",
+    "navy blue",
+    "nude",
+    "off white",
+    "olive",
+    "orange",
+    "peach",
+    "pink",
+    "purple",
+    "red",
+    "rose",
+    "rust",
+    "sea green",
     "silver",
-    "fluorescent green",
+    "skin",
+    "tan",
+    "taupe",
+    "teal",
+    "turquoise blue",
+    "white",
+    "yellow",
   ],
   usage: [
     "casual",
@@ -122,48 +122,54 @@ const OPTIONS = {
     "party",
     "travel",
   ],
-  season: ["fall", "summer", "winter", "spring"],
   style: ["0", "1", "2", "3", "4", "5"],
 };
 
-document.querySelectorAll(".select-box").forEach((box) => {
-  const key = box.dataset.key;
-  const data = OPTIONS[key];
+document.querySelectorAll(".autocomplete").forEach((input) => {
+  const key = input.dataset.key;
+  const dropdown = input.nextElementSibling;
 
-  box.innerHTML = `
-    <div class="relative">
-      <input class="select-input" placeholder="${key}" />
-      <div class="dropdown hidden"></div>
-    </div>
-  `;
-
-  const input = box.querySelector("input");
-  const dropdown = box.querySelector(".dropdown");
-
-  const render = (list) => {
-    dropdown.innerHTML = list
-      .map((item) => `<div class="dropdown-item">${item}</div>`)
-      .join("");
-  };
+  function render(items) {
+    dropdown.innerHTML = "";
+    items.forEach((item) => {
+      const div = document.createElement("div");
+      div.textContent = item;
+      div.onclick = () => {
+        input.value = item;
+        dropdown.style.display = "none";
+      };
+      dropdown.appendChild(div);
+    });
+    dropdown.style.display = "block";
+  }
 
   input.addEventListener("focus", () => {
-    dropdown.classList.remove("hidden");
-    render(data);
+    render(data[key]);
   });
 
-  input.addEventListener("input", (e) => {
-    const val = e.target.value.toLowerCase();
-    render(data.filter((d) => d.toLowerCase().includes(val)));
-  });
-
-  dropdown.addEventListener("click", (e) => {
-    if (e.target.classList.contains("dropdown-item")) {
-      input.value = e.target.textContent;
-      dropdown.classList.add("hidden");
-    }
+  input.addEventListener("input", () => {
+    const value = input.value.toLowerCase();
+    const filtered = data[key].filter((item) =>
+      item.toLowerCase().includes(value)
+    );
+    render(filtered);
   });
 
   document.addEventListener("click", (e) => {
-    if (!box.contains(e.target)) dropdown.classList.add("hidden");
+    if (!input.parentElement.contains(e.target)) {
+      dropdown.style.display = "none";
+    }
+  });
+});
+
+/* SEASON SELECTION */
+let selectedSeason = null;
+document.querySelectorAll(".season-options div").forEach((item) => {
+  item.addEventListener("click", () => {
+    document
+      .querySelectorAll(".season-options div")
+      .forEach((el) => el.classList.remove("active"));
+    item.classList.add("active");
+    selectedSeason = item.dataset.value;
   });
 });
