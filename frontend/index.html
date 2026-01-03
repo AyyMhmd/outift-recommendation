@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Outfit Recommender</title>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body
+    class="min-h-screen bg-gradient-to-br from-purple-200 via-pink-200 to-blue-200"
+  >
+    <main class="max-w-5xl mx-auto p-6">
+      <header class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">
+          SMART OUTFIT RECOMMENDER
+        </h1>
+        <p class="text-gray-600 mt-2">Choose your outfit preferences</p>
+      </header>
+
+      <section class="glass-card">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="select-box" data-key="gender"></div>
+          <div class="select-box" data-key="subcategory"></div>
+          <div class="select-box" data-key="articletype"></div>
+          <div class="select-box" data-key="basecolour"></div>
+          <div class="select-box" data-key="usage"></div>
+          <div class="select-box" data-key="season"></div>
+          <div class="select-box" data-key="style"></div>
+        </div>
+
+        <button class="btn-primary mt-6">Find Recommendation</button>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
