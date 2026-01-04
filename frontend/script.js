@@ -173,3 +173,20 @@ document.querySelectorAll(".season-options div").forEach((item) => {
     selectedSeason = item.dataset.value;
   });
 });
+
+// hasil untuk output
+// Fungsi untuk menampilkan hasil saat tombol diklik
+document.querySelector(".btn-primary").addEventListener("click", () => {
+    const resultSection = document.getElementById("result-section");
+    
+    // Memberikan efek loading sederhana
+    document.querySelector(".btn-primary").innerText = "Searching...";
+    
+    setTimeout(() => {
+        resultSection.style.display = "block";
+        document.querySelector(".btn-primary").innerText = "Find Outfit Recommendations";
+        
+        // Scroll otomatis ke hasil
+        resultSection.scrollIntoView({ behavior: 'smooth' });
+    }, 800);
+});
