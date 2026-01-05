@@ -122,7 +122,19 @@ const data = {
     "party",
     "travel",
   ],
-  style: ["0", "1", "2", "3", "4", "5"],
+  kota: [
+    "Jakarta Pusat",
+    "Jakarta Utara",
+    "Jakarta Selatan",
+    "Jakarta Barat",
+    "Jakarta Timur",
+    "Kepulauan Seribu",
+    "Bogor",
+    "Depok",
+    "Bekasi",
+    "Tangerang",
+    "Tangerang Selatan"
+  ],
 };
 
 document.querySelectorAll(".autocomplete").forEach((input) => {
