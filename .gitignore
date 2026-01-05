@@ -3,15 +3,13 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.env
 
 # Virtual environment
 venv/
-.env/
 .venv/
 
-# Model ML
-ml/model/*.pkl
+# Model ML (include pkl files for team)
+# ml/model/*.pkl
 
 # Dataset
 ml/dataset/raw/

@@ -1,0 +1,21 @@
+# Backend Requirements for Outfit Recommendation System
+# Python 3.8+
+
+# Web Framework
+flask==2.3.3
+flask-cors==4.0.0
+
+# HTTP Requests (for Weather API)
+requests==2.31.0
+
+# Machine Learning
+scikit-learn==1.3.0
+joblib==1.3.2
+pandas==2.0.3
+numpy==1.24.3
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# Production Server (optional)
+gunicorn==21.2.0
