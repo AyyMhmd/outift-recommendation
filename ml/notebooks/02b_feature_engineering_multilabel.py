@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import pickle
+import ast
 from sklearn.preprocessing import LabelEncoder, MultiLabelBinarizer
 
 # ===============================
@@ -21,6 +22,12 @@ ENCODER_PATH = os.path.join(MODEL_DIR, "encoders.pkl")
 # 1. LOAD CLEAN DATA
 # ===============================
 df = pd.read_csv(CLEAN_PATH)
+
+# Parse stringified lists back to python lists
+multilabel_cols = ["top", "bottom", "outerwear", "footwear"]
+for col in multilabel_cols:
+    if col in df.columns:
+        df[col] = df[col].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
 
 print("Clean dataset shape:", df.shape)
 

@@ -197,17 +197,74 @@ document.querySelectorAll(".season-options div").forEach((item) => {
   });
 });
 
+/* GPS LOCATION */
+let userLocation = null; // Store lat/lon
+
+document.getElementById("gps-btn").addEventListener("click", () => {
+  const gpsBtn = document.getElementById("gps-btn");
+  const cityInput = document.querySelector('[data-key="kota"]');
+
+  if (!navigator.geolocation) {
+    alert("Geolocation tidak didukung oleh browser anda.");
+    return;
+  }
+
+  gpsBtn.disabled = true;
+  gpsBtn.innerHTML = "⏳";
+  cityInput.value = "Mencari lokasi...";
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      userLocation = {
+        lat: position.coords.latitude,
+        lon: position.coords.longitude
+      };
+
+      // Update UI
+      cityInput.value = "Lokasi Saya (GPS)";
+      gpsBtn.innerHTML = "✅";
+      gpsBtn.disabled = false;
+
+      // Reset after 3 seconds
+      setTimeout(() => {
+        gpsBtn.innerHTML = "📍";
+      }, 3000);
+
+      console.log("📍 Location acquired:", userLocation);
+    },
+    (error) => {
+      console.error("Error getting location:", error);
+      alert("Gagal mengambil lokasi. Pastikan GPS aktif dan izin diberikan.");
+      gpsBtn.innerHTML = "📍";
+      gpsBtn.disabled = false;
+      cityInput.value = "";
+      userLocation = null;
+    }
+  );
+});
+
 // ===========================
 // GET FORM VALUES
 // ===========================
 function getFormValues() {
+  const cityInput = document.querySelector('[data-key="kota"]').value;
+
+  // If GPS was used but city input cleared manually, reset userLocation
+  if (cityInput !== "Lokasi Saya (GPS)" && userLocation) {
+    // Optional: keep using GPS if user wants, but typically if they type a city, use the city.
+    // For now, if they typed something else, we ignore GPS.
+    userLocation = null;
+  }
+
   return {
     gender: document.querySelector('[data-key="gender"]').value,
     subcategory: document.querySelector('[data-key="subcategory"]').value,
     articleType: document.querySelector('[data-key="articleType"]').value,
     baseColour: document.querySelector('[data-key="baseColour"]').value,
     usage: document.querySelector('[data-key="usage"]').value,
-    city: document.querySelector('[data-key="kota"]').value,
+    city: userLocation ? null : cityInput, // If userLocation exists, city is optional/ignored by backend
+    lat: userLocation ? userLocation.lat : null,
+    lon: userLocation ? userLocation.lon : null,
     season: selectedSeason || "summer"
   };
 }
@@ -229,27 +286,27 @@ function renderOutfitCards(recommendations, weather) {
 
   recommendations.forEach((rec) => {
     const config = categoryConfig[rec.category] || { name: rec.category, color: "#888", textColor: "" };
-    
+
     // Skip if no recommendation (type is none and we don't want to show it)
     const showCard = rec.type !== "none" || rec.category === "outerwear";
-    
+
     if (showCard) {
       const card = document.createElement("div");
       card.className = "outfit-card";
-      
-      const confidenceClass = rec.confidence >= 85 ? "" : 
-                              rec.confidence >= 70 ? "blue-text" : "purple-text";
-      
-      const statusText = rec.confidence >= 85 ? "✓ Cocok" : 
-                         rec.confidence >= 70 ? "✓ Trendy" : "✓ Opsional";
+
+      const confidenceClass = rec.confidence >= 85 ? "" :
+        rec.confidence >= 70 ? "blue-text" : "purple-text";
+
+      const statusText = rec.confidence >= 85 ? "✓ Cocok" :
+        rec.confidence >= 70 ? "✓ Trendy" : "✓ Opsional";
 
       card.innerHTML = `
         <div class="card-tag">${config.name}</div>
         <div class="img-container">
-          ${rec.image ? 
-            `<img src="${rec.image}" alt="${rec.name}" onerror="this.src='https://via.placeholder.com/300x200?text=${encodeURIComponent(rec.name)}'">` :
-            `<div class="no-image">Tidak diperlukan</div>`
-          }
+          ${rec.image ?
+          `<img src="${rec.image}" alt="${rec.name}" onerror="this.src='https://via.placeholder.com/300x200?text=${encodeURIComponent(rec.name)}'">` :
+          `<div class="no-image">Tidak diperlukan</div>`
+        }
         </div>
         <div class="card-stats">
           <span class="percentage ${confidenceClass}">${rec.confidence}%</span>
@@ -258,7 +315,7 @@ function renderOutfitCards(recommendations, weather) {
         <p class="card-desc">${rec.reason}</p>
         <p class="card-name"><strong>${rec.name}</strong></p>
       `;
-      
+
       cardsContainer.appendChild(card);
     }
   });
@@ -270,7 +327,7 @@ function renderOutfitCards(recommendations, weather) {
 function renderWeatherInfo(weather) {
   // Check if weather info section exists, if not create it
   let weatherSection = document.getElementById("weather-info");
-  
+
   if (!weatherSection) {
     const resultSection = document.getElementById("result-section");
     weatherSection = document.createElement("div");
@@ -280,7 +337,7 @@ function renderWeatherInfo(weather) {
   }
 
   const iconUrl = `https://openweathermap.org/img/wn/${weather.icon}@2x.png`;
-  
+
   weatherSection.innerHTML = `
     <div class="weather-display">
       <img src="${iconUrl}" alt="Weather icon" class="weather-icon">
@@ -322,7 +379,7 @@ async function getRecommendations(formData) {
 async function getWeather(city) {
   try {
     const response = await fetch(`${API_BASE_URL}/api/weather?city=${encodeURIComponent(city)}`);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -371,18 +428,18 @@ function hideLoading(button) {
 document.querySelector(".btn-primary").addEventListener("click", async () => {
   const button = document.querySelector(".btn-primary");
   const resultSection = document.getElementById("result-section");
-  
+
   // Get form values
   const formData = getFormValues();
-  
+
   // Validate required fields
   if (!formData.gender) {
     alert("Silakan pilih Gender terlebih dahulu!");
     return;
   }
-  
-  if (!formData.city) {
-    alert("Silakan pilih Kota terlebih dahulu!");
+
+  if (!formData.city && (!formData.lat || !formData.lon)) {
+    alert("Silakan pilih Kota atau gunakan GPS!");
     return;
   }
 
@@ -401,16 +458,16 @@ document.querySelector(".btn-primary").addEventListener("click", async () => {
         <div id="weather-info"></div>
         <div class="cards"></div>
       `;
-      
+
       // Render weather info
       renderWeatherInfo(result.weather);
-      
+
       // Render outfit cards
       renderOutfitCards(result.recommendations, result.weather);
-      
+
       // Show result section
       resultSection.style.display = "block";
-      
+
       // Scroll to results
       resultSection.scrollIntoView({ behavior: 'smooth' });
     } else {

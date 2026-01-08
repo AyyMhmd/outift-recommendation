@@ -11,6 +11,7 @@ import pickle
 import pandas as pd
 import numpy as np
 import os
+import traceback
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS untuk akses dari frontend
@@ -50,10 +51,34 @@ except Exception as e:
 # MAPPING DATA
 # ===========================
 # Mapping untuk encode input
-GENDER_MAP = {"laki-laki": 0, "perempuan": 1, "men": 0, "women": 1, "boys": 0, "girls": 1, "unisex": 0}
-WEATHER_MAP = {"berawan": 0, "cerah": 1, "gerimis": 2, "hujan": 3, "mendung": 4}
-LOCATION_MAP = {"indoor": 0, "outdoor": 1}
-ACTIVITY_MAP = {"bekerja": 0, "berjalan": 1, "kondangan": 2, "olahraga": 3, "santai": 4}
+# Mapping untuk encode input
+# Keys must be lowercased for robust matching
+GENDER_MAP = {
+    "laki-laki": 0, "perempuan": 1, 
+    "men": 0, "women": 1, "boys": 0, "girls": 1, "unisex": 0,
+    "pria": 0, "wanita": 1
+}
+
+WEATHER_MAP = {
+    "berawan": 0, "cerah": 1, "gerimis": 2, "hujan": 3, "mendung": 4,
+    "cloudy": 0, "clear": 1, "drizzle": 2, "rain": 3, "overcast": 4,
+    "clouds": 0, "rainy": 3, "sunny": 1
+}
+
+LOCATION_MAP = {
+    "indoor": 0, "outdoor": 1,
+    "dalam ruangan": 0, "luar ruangan": 1
+}
+
+ACTIVITY_MAP = {
+    "bekerja": 0, "berjalan": 1, "kondangan": 2, "olahraga": 3, "santai": 4,
+    "formal": 0, "work": 0, "office": 0,
+    "walking": 1, "travel": 1, "casual": 1, 
+    "party": 2, "wedding": 2,
+    "sports": 3, "exercise": 3, "running": 3,
+    "relax": 4, "hangout": 4, "home": 4, 
+    "smart casual": 0, "ethnic": 2
+}
 
 # Mapping kota ke format OpenWeatherMap
 CITY_MAP = {
@@ -101,16 +126,40 @@ def get_weather_category(weather_desc, weather_id):
 # ===========================
 # HELPER FUNCTIONS
 # ===========================
-def get_weather_data(city):
+def get_location():
+    """Detect location based on IP address"""
+    try:
+        response = requests.get("http://ip-api.com/json/", timeout=5)
+        data = response.json()
+        if data["status"] == "success":
+            return data["city"]
+        else:
+            print("Failed to detect location, defaulting to Jakarta.")
+            return "Jakarta"
+    except Exception as e:
+        print(f"Error detecting location: {e}")
+        return "Jakarta"
+
+def get_weather_data(city=None, lat=None, lon=None):
     """Ambil data cuaca dari OpenWeatherMap API"""
-    city_query = CITY_MAP.get(city, f"{city},ID")
-    
     params = {
-        "q": city_query,
         "appid": WEATHER_API_KEY,
         "units": "metric",
         "lang": "id"
     }
+
+    if lat and lon:
+        print(f"DEBUG: Fetching weather for coordinates: {lat}, {lon}")
+        params["lat"] = lat
+        params["lon"] = lon
+    else:
+        # Auto-detect location if nothing provided
+        if not city:
+            city = get_location()
+        
+        city_query = CITY_MAP.get(city, f"{city},ID")
+        # print(f"DEBUG: Fetching weather for city: {city_query}")
+        params["q"] = city_query
     
     try:
         response = requests.get(WEATHER_BASE_URL, params=params, timeout=10)
@@ -138,7 +187,7 @@ def get_weather_data(city):
             "weather_desc": "berawan",
             "weather_category": "berawan",
             "feels_like": 30,
-            "city": city,
+            "city": city if city else "Jakarta",
             "icon": "03d"
         }
 
@@ -179,12 +228,34 @@ def predict_outfit(input_data):
         # Prepare input features sesuai dengan X_multilabel.csv
         # Columns: gender, weather, temperature, humidity, location, activity, duration
         
-        gender = GENDER_MAP.get(input_data["gender"].lower(), 0)
-        weather = WEATHER_MAP.get(input_data["weather_category"], 0)
+        gender_val = input_data["gender"]
+        if isinstance(gender_val, str):
+            gender = GENDER_MAP.get(gender_val.lower(), 0)
+        else:
+            gender = gender_val
+
+        weather_val = input_data["weather_category"]
+        # weather_category from API might be different than our map keys if not normalized
+        if isinstance(weather_val, str):
+             weather = WEATHER_MAP.get(weather_val.lower(), 0)
+        else:
+             weather = weather_val
+
         temperature = input_data["temperature"]
         humidity = input_data["humidity"]
-        location = LOCATION_MAP.get(input_data["location"], 0)
-        activity = ACTIVITY_MAP.get(input_data["activity"], 4)
+        
+        location_val = input_data["location"]
+        if isinstance(location_val, str):
+            location = LOCATION_MAP.get(location_val.lower(), 0)
+        else:
+            location = location_val
+            
+        activity_val = input_data["activity"]
+        if isinstance(activity_val, str):
+             activity = ACTIVITY_MAP.get(activity_val.lower(), 4)
+        else:
+             activity = activity_val
+             
         duration = 12  # Default duration
         
         # Create DataFrame dengan kolom yang sesuai
@@ -203,17 +274,162 @@ def predict_outfit(input_data):
 
 def decode_predictions(predictions, input_data):
     """Decode binary predictions ke outfit recommendations"""
-    # Berdasarkan analisis multilabel_clean.csv, kita punya 4 kategori output:
-    # top, bottom, outerwear, footwear
     
-    # Karena model output mungkin berbeda, kita gunakan logic berbasis cuaca
-    weather_cat = input_data.get("weather_category", "berawan")
-    temperature = input_data.get("temperature", 28)
-    activity = input_data.get("activity", "santai")
-    gender = input_data.get("gender", "").lower()
+    # Get output encoder (MultiLabelBinarizer)
+    if isinstance(encoders, dict) and "output_encoder" in encoders:
+        mlb = encoders["output_encoder"]
+        classes = mlb.classes_
+    else:
+        # Fallback if encoders structure is different
+        print("⚠️ Warning: Output encoder not found or invalid format")
+        return get_fallback_recommendation(input_data)
+
+    # Get predicted items directly from the binary vector
+    predicted_items = []
+    for idx, is_present in enumerate(predictions):
+        if is_present == 1:
+            predicted_items.append(classes[idx])
+            
+    # print(f"DEBUG: Model predicted raw items: {predicted_items}")
     
-    recommendations = generate_smart_recommendations(weather_cat, temperature, activity, gender)
+    # Categorize items
+    recommendations = {
+        "top": {"type": "none", "name": "Tidak diperlukan"},
+        "bottom": {"type": "none", "name": "Tidak diperlukan"},
+        "outerwear": {"type": "none", "name": "Tidak diperlukan"},
+        "footwear": {"type": "none", "name": "Tidak diperlukan"}
+    }
+    
+    # Mapping item types to categories
+    # Note: These keys must match the labels in mlb.classes_
+    item_categories = {
+        "kaos": "top", "kemeja": "top", "blouse": "top", "jas": "top", 
+        "tank top": "top", "kaos olahraga": "top", "atasan formal": "top", "kebaya": "top",
+        "sweater": "top", "jersey": "top",
+        
+        "celana panjang": "bottom", "celana pendek": "bottom", "rok": "bottom", 
+        "legging": "bottom", "celana olahraga": "bottom", "jeans": "bottom", 
+        "chino": "bottom", "celana bahan": "bottom", "celana formal": "bottom",
+        
+        "jaket": "outerwear", "hoodie": "outerwear", "cardigan": "outerwear",
+        "jaket waterproof": "outerwear", "raincoat": "outerwear", "jaket ringan": "outerwear",
+        "jaket tipis": "outerwear", "tanpa pakaian luar": "outerwear",
+        
+        "sneakers": "footwear", "sepatu bot": "footwear", "sepatu pantofel": "footwear", 
+        "sepatu hak": "footwear", "sandal": "footwear", "running shoes": "footwear",
+        "boots": "footwear", "sepatu waterproof": "footwear", "flat shoes": "footwear",
+        "wedges": "footwear", "loafers": "footwear", "casual shoes": "footwear"
+    }
+
+    found_categories = set()
+    
+    for item in predicted_items:
+        # Check standard category map
+        category = item_categories.get(item)
+        
+        # Heuristic checks if item not in map (e.g. typos or variations)
+        if not category:
+            if "celana" in item or "rok" in item: category = "bottom"
+            elif "jaket" in item or "hoodie" in item: category = "outerwear"
+            elif "sepatu" in item or "sandal" in item: category = "footwear"
+            elif "kaos" in item or "kemeja" in item: category = "top"
+        
+        if category and category not in found_categories:
+            recommendations[category] = {
+                "name": item.title(),
+                "type": item,
+                "confidence": 85, # Default confidence for now
+                "reason": f"Disarankan oleh AI untuk aktivitas {input_data.get('activity', '')}"
+            }
+            found_categories.add(category)
+            
+    # If key categories missing, fallback to smart recommendations for those specific slots?
+    # Or just return what the model predicted. 
+    # Let's keep it strict to the model for now, but ensure 'none' is handled.
+    
     return recommendations
+
+def filter_recommendations(recommendations, input_data):
+    """
+    Filter heuristic untuk memperbaiki hasil prediksi yang tidak masuk akal.
+    Rules:
+    1. Temp > 28°C & !Hujan -> Remove Heavy Outerwear
+    2. Activity = Olahraga -> Prioritize Sportswear
+    3. Activity = Formal -> Remove Casual items (Shorts, Sandals)
+    """
+    filtered = recommendations.copy()
+    
+    # Extract conditions
+    temp = input_data.get("temperature", 25)
+    weather_cat = input_data.get("weather_category", 0) # 0=berawan, 1=cerah, 3=hujan
+    activity = input_data.get("activity", 4) # 4=Santai, 3=Olahraga, 0=Bekerja
+    
+    # --- RULE 1: HEAT CHECK ---
+    # Jika panas (>28C) dan tidak hujan (3), hapus jaket tebal
+    should_remove_outerwear = False
+    if temp > 28 and weather_cat != 3: 
+        should_remove_outerwear = True
+        
+    if should_remove_outerwear:
+        outer = filtered.get("outerwear", {})
+        if outer.get("type") in ["jaket", "hoodie", "coat", "sweater", "blazer", "cardigan"]:
+            print(f"DEBUG: Removing outerwear '{outer.get('name')}' due to heat ({temp}C)")
+            filtered["outerwear"] = {"type": "none", "name": "Tidak diperlukan"}
+
+    # --- RULE 2: SPORT CHECK ---
+    # Jika olahraga (3), pastikan footwear bukan pantofel/hak
+    if activity == 3: 
+        foot = filtered.get("footwear", {})
+        if foot.get("type") in ["sepatu pantofel", "sepatu hak", "boots", "loafers"]:
+            print(f"DEBUG: Replacing footwear '{foot.get('name')}' for sports")
+            filtered["footwear"] = {
+                "name": "Running Shoes", 
+                "type": "running shoes", 
+                "confidence": 95, 
+                "reason": "Wajib untuk olahraga"
+            }
+            
+        # Pastikan tidak pakai jeans/chino
+        bottom = filtered.get("bottom", {})
+        if bottom.get("type") in ["jeans", "chino", "celana bahan", "rok"]:
+             print(f"DEBUG: Replacing bottom '{bottom.get('name')}' for sports")
+             filtered["bottom"] = {
+                 "name": "Celana Olahraga",
+                 "type": "celana olahraga",
+                 "confidence": 95,
+                 "reason": "Nyaman untuk bergerak"
+             }
+
+    # --- RULE 3: FORMAL CHECK ---
+    # Jika bekerja (0) atau kondangan (2)
+    if activity in [0, 2]:
+        # No shorts
+        bottom = filtered.get("bottom", {})
+        if bottom.get("type") in ["celana pendek", "panty", "hotpants"]:
+            gender = input_data.get("gender", 0)
+            new_bottom = "Celana Bahan" if gender == 0 else "Rok/Celana Bahan"
+            new_type = "celana bahan"
+            
+            print(f"DEBUG: Replacing casual bottom '{bottom.get('name')}' for formal")
+            filtered["bottom"] = {
+                "name": new_bottom,
+                "type": new_type,
+                "confidence": 90,
+                "reason": "Sopan untuk formal"
+            }
+            
+        # No flip-flops/sandals (unless wanita & cantik? but generally no jepit)
+        foot = filtered.get("footwear", {})
+        if foot.get("type") in ["sandal", "flip flops", "crocs"]:
+             print(f"DEBUG: Replacing casual footwear '{foot.get('name')}' for formal")
+             filtered["footwear"] = {
+                 "name": "Sepatu Tertutup",
+                 "type": "sepatu pantofel",
+                 "confidence": 90,
+                 "reason": "Formal look"
+             }
+
+    return filtered
 
 def generate_smart_recommendations(weather_category, temperature, activity, gender):
     """Generate smart outfit recommendations berdasarkan kondisi"""
@@ -440,9 +656,12 @@ def home():
 
 @app.route("/api/weather", methods=["GET"])
 def get_weather():
-    """Get weather data untuk kota tertentu"""
-    city = request.args.get("city", "Jakarta")
-    weather_data = get_weather_data(city)
+    """Get weather data untuk kota tertentu atau koordinat"""
+    city = request.args.get("city")
+    lat = request.args.get("lat")
+    lon = request.args.get("lon")
+    
+    weather_data = get_weather_data(city=city, lat=lat, lon=lon)
     return jsonify(weather_data)
 
 @app.route("/api/recommend", methods=["POST"])
@@ -458,10 +677,12 @@ def recommend_outfit():
         base_colour = data.get("baseColour", "")
         usage = data.get("usage", "casual")
         season = data.get("season", "summer")
-        city = data.get("city", "Jakarta")
+        city = data.get("city")
+        lat = data.get("lat")
+        lon = data.get("lon")
         
         # Get weather data
-        weather_data = get_weather_data(city)
+        weather_data = get_weather_data(city=city, lat=lat, lon=lon)
         
         # Map usage ke activity
         activity = map_activity(usage, subcategory)
@@ -470,22 +691,54 @@ def recommend_outfit():
         location = determine_location(activity, subcategory)
         
         # Prepare input untuk prediksi
+        # Normalize and map inputs
+        gender_norm = str(gender).lower().strip()
+        usage_norm = str(usage).lower().strip()
+        activity_norm = str(activity).lower().strip()
+        
+        # Override activity from map if possible
+        mapped_activity = ACTIVITY_MAP.get(usage_norm) or ACTIVITY_MAP.get(activity_norm) or 4 # Default santai
+        
+        # Override gender from map
+        mapped_gender = GENDER_MAP.get(gender_norm, 0) # Default laki-laki
+        
+        # Override location from map if passed string
+        # location might be int (0/1) or string ("indoor"/"outdoor")
+        location_norm = str(location).lower().strip()
+        # If it's already "0" or "none", map it safely
+        if location_norm == "0": mapped_location = 0
+        elif location_norm == "1": mapped_location = 1
+        else: mapped_location = LOCATION_MAP.get(location_norm, 1) # Default outdoor
+        
+        # Weather map
+        weather_cat_norm = str(weather_data["weather_category"]).lower()
+        mapped_weather = WEATHER_MAP.get(weather_cat_norm, 0)
+
+        print(f"DEBUG: Input Processing:")
+        print(f"  Gender: '{gender}' -> '{gender_norm}' -> {mapped_gender}")
+        print(f"  Usage: '{usage}' -> Activity Map: {ACTIVITY_MAP.get(usage_norm)}")
+        print(f"  Final Activity: {mapped_activity}")
+        print(f"  Weather: '{weather_cat_norm}' -> {mapped_weather}")
+
         input_data = {
-            "gender": gender,
-            "subcategory": subcategory,
-            "article_type": article_type,
-            "base_colour": base_colour,
-            "usage": usage,
-            "season": season,
-            "activity": activity,
-            "location": location,
+            "gender": mapped_gender,
+            "subcategory": subcategory, # Not used by model based on previous analysis, but kept
+            "article_type": article_type, # Not used
+            "base_colour": base_colour, # Not used
+            "usage": usage, # Mapped to activity
+            "season": season, # Not explicitly used by model input based on inspect_model output
+            "activity": mapped_activity,
+            "location": mapped_location,
             "temperature": weather_data["temperature"],
             "humidity": weather_data["humidity"],
-            "weather_category": weather_data["weather_category"]
+            "weather_category": mapped_weather # Used for model consistency? Model trained on integer categories
         }
         
         # Get recommendations
         recommendations = predict_outfit(input_data)
+        
+        # Apply Smart Filters (Heuristics)
+        recommendations = filter_recommendations(recommendations, input_data)
         
         # Format response dengan image URLs
         formatted_recommendations = []
@@ -517,13 +770,16 @@ def recommend_outfit():
                 "usage": usage,
                 "activity": activity,
                 "season": season,
-                "city": city
+                "city": city,
+                "mapped_activity": mapped_activity, 
+                "mapped_weather": mapped_weather
             },
             "recommendations": formatted_recommendations
         })
         
     except Exception as e:
         print(f"Error in recommend_outfit: {e}")
+        traceback.print_exc()
         return jsonify({
             "success": False,
             "error": str(e)

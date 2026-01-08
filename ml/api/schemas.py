@@ -5,4 +5,4 @@ class OutfitInput(BaseModel):
     gender: str
     season: str
     activity: str
-    city: str
+    city: str = None
